@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meu Financeiro</title>
+    <!-- Biblioteca de Gráficos (Chart.js) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; letter-spacing: -0.2px; }
+        body { background-color: #f8fafc; color: #0f172a; font-size: 11px; }
+        
+        .header { background: linear-gradient(135deg, #0f172a, #1e3a8a); color: white; padding: 10px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .header h2 { font-size: 13px; font-weight: 600; margin: 0; }
+
+        .container { padding: 8px; max-width: 420px; margin: auto; }
+        
+        .card { background: white; padding: 10px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.03); margin-bottom: 8px; border: 1px solid #f1f5f9; }
+        
+        .resumo { display: flex; justify-content: space-between; text-align: center; padding: 6px; }
+        .resumo div { flex: 1; }
+        .resumo span { font-size: 9px; color: #64748b; text-transform: uppercase; font-weight: 600; }
+        .resumo strong { display: block; font-size: 12px; margin-top: 2px; }
+        .ganho-text { color: #059669; }
+        .gasto-text { color: #dc2626; }
+        
+        label { font-size: 9px; font-weight: 600; color: #475569; display: block; margin-top: 8px; text-transform: uppercase; }
+        select, input { width: 100%; padding: 6px 8px; margin-top: 2px; border-radius: 5px; border: 1px solid #cbd5e1; background-color: #f8fafc; font-size: 11px; outline: none; transition: 0.2s; }
+        select:focus, input:focus { border-color: #2563eb; background-color: #fff; }
+        
+        /* Botões de Tipo de Movimentação Lado a Lado */
+        .tipo-container { display: flex; gap: 5px; margin-top: 2px; }
+        .btn-tipo { flex: 1; padding: 6px; border: 1px solid #cbd5e1; background: #f8fafc; color: #475569; border-radius: 5px; font-weight: 600; cursor: pointer; transition: 0.2s; margin-top: 0; font-size: 11px; }
+        .btn-tipo.ativo-ganho { background-color: #059669; color: white; border-color: #059669; }
+        .btn-tipo.ativo-gasto { background-color: #dc2626; color: white; border-color: #dc2626; }
+
+        button { width: 100%; background-color: #2563eb; color: white; border: none; padding: 7px; margin-top: 10px; border-radius: 5px; font-size: 11px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        button:hover { background-color: #1d4ed8; }
+        
+        /* Layout de Categoria com Gerenciamento Interno */
+        .linha-topo-cat { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+        .linha-topo-cat label { margin-top: 0; }
+        .btn-gerenciar { background: none; border: none; color: #2563eb; font-size: 9px; font-weight: 600; cursor: pointer; padding: 0; width: auto; margin-top: 0; }
+        .btn-gerenciar:hover { text-decoration: underline; background: none; }
+
+        /* Painel de Gerenciamento de Categorias e Subcategorias */
+        .painel-categorias { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px; margin-top: 4px; display: none; }
+        .painel-categorias.ativo { display: block; }
+        .input-nova-cat { display: flex; gap: 4px; margin-bottom: 5px; }
+        .input-nova-cat input { margin-top: 0; font-size: 10px; padding: 4px 6px; }
+        .btn-add-mini { width: auto; margin-top: 0; padding: 4px 7px; background-color: #10b981; font-size: 10px; }
+        
+        .lista-gerenciar-cat { max-height: 150px; overflow-y: auto; list-style: none; }
+        .item-gerenciar-cat { background: white; margin-bottom: 3px; border-radius: 4px; border: 1px solid #e2e8f0; font-size: 10px; overflow: hidden; }
+        .item-principal { display: flex; justify-content: space-between; align-items: center; padding: 5px 7px; background: #fff; cursor: pointer; }
+        .item-principal:hover { background: #f8fafc; }
+        
+        .subcategorias-box { display: none; padding: 5px 7px 6px 14px; background: #fdfdfd; border-top: 1px solid #f1f5f9; }
+        .item-subcat { display: flex; justify-content: space-between; align-items: center; font-size: 10px; color: #475569; margin-top: 2px; }
+        
+        .btn-acoes-cat { display: flex; gap: 3px; }
+        .btn-acao-mini { background: none; border: none; cursor: pointer; font-size: 10px; padding: 2px; width: auto; margin-top: 0; }
+        .btn-add-sub { color: #2563eb; font-weight: 600; }
+        .btn-del-cat { color: #ef4444; }
+
+        /* Pop-ups Modernos (Modais) */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(2px); display: flex; justify-content: center; align-items: center; z-index: 1000; padding: 10px; }
+        .modal-box { background: white; padding: 14px; border-radius: 8px; width: 100%; max-width: 280px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border: 1px solid #e2e8f0; font-size: 11px; animation: modalScale 0.2s ease; }
+        @keyframes modalScale { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .modal-box h4 { font-size: 12px; font-weight: 600; color: #0f172a; margin-bottom: 6px; }
+        .modal-box p { font-size: 11px; color: #475569; margin-bottom: 10px; line-height: 1.3; }
+        .modal-box input { width: 100%; padding: 6px 8px; border-radius: 5px; border: 1px solid #cbd5e1; font-size: 11px; outline: none; margin-bottom: 10px; }
+        .modal-actions { display: flex; gap: 6px; justify-content: flex-end; }
+        .modal-btn { padding: 5px 10px; border-radius: 5px; font-size: 10px; font-weight: 600; cursor: pointer; border: none; width: auto; margin-top: 0; }
+        .modal-btn-ok { background-color: #2563eb; color: white; }
+        .modal-btn-ok:hover { background-color: #1d4ed8; }
+        .modal-btn-cancel { background-color: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+        .modal-btn-cancel:hover { background-color: #e2e8f0; }
+
+        /* Área do Gráfico */
+        .chart-container { position: relative; height: 160px; width: 100%; margin-top: 6px; }
+
+        /* Tabela Histórico Compacta */
+        .card h3 { font-size: 11px; margin-bottom: 6px; color: #0f172a; border-bottom: 1px solid #f1f5f9; padding-bottom: 4px; font-weight: 600; }
+        .historico { width: 100%; border-collapse: collapse; font-size: 10px; }
+        .historico th { text-align: left; padding: 5px 3px; color: #64748b; font-size: 9px; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; font-weight: 600; }
+        .historico td { padding: 6px 3px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+        
+        .data-hora { font-size: 8px; color: #94a3b8; line-height: 1.1; }
+        .forma-pagto { font-size: 8px; color: #475569; background-color: #f1f5f9; padding: 1px 4px; border-radius: 3px; display: inline-block; margin-top: 1px; font-weight: 500; border: 1px solid #e2e8f0; }
+        
+        .btn-apagar-tudo { background-color: #fff; color: #ef4444; border: 1px solid #f87171; padding: 5px; font-size: 10px; margin-top: 8px; }
+        .btn-apagar-tudo:hover { background-color: #fef2f2; }
+        .btn-del { background: transparent; border: none; font-size: 11px; cursor: pointer; padding: 2px; margin: 0; color: #94a3b8; width: auto; }
+        .btn-del:hover { color: #dc2626; }
+    </style>
+</head>
+<body>
+
+    <!-- Modal Personalizado (Pop-ups Modernos) -->
+    <div id="customModal" class="modal-overlay" style="display: none;">
+        <div class="modal-box">
+            <h4 id="modalTitle">Atenção</h4>
+            <p id="modalMessage">Mensagem aqui</p>
+            <div id="modalInputContainer" style="display: none;">
+                <input type="text" id="modalInput" placeholder="Digite aqui...">
+            </div>
+            <div class="modal-actions">
+                <button type="button" id="modalBtnCancel" class="modal-btn modal-btn-cancel" style="display:none;" onclick="fecharModal(false)">Cancelar</button>
+                <button type="button" id="modalBtnOk" class="modal-btn modal-btn-ok" onclick="fecharModal(true)">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="header">
+        <h2>💰 Meu Controle Diário</h2>
+    </div>
+
+    <div class="container">
+        <!-- Resumo do Saldo -->
+        <div class="card resumo">
+            <div>
+                <span>Entradas</span>
+                <strong class="ganho-text" id="totalGanhos">R$ 0,00</strong>
+            </div>
+            <div>
+                <span>Saídas</span>
+                <strong class="gasto-text" id="totalGastos">R$ 0,00</strong>
+            </div>
+            <div>
+                <span>Saldo Final</span>
+                <strong id="saldoAtual">R$ 0,00</strong>
+            </div>
+        </div>
+
+        <!-- Formulário de Entrada -->
+        <div class="card">
+            <label>Tipo de Movimentação</label>
+            <div class="tipo-container">
+                <button type="button" id="btnGanho" class="btn-tipo ativo-ganho" onclick="setTipoMovimento('Ganho')">🟢 Ganho</button>
+                <button type="button" id="btnGasto" class="btn-tipo" onclick="setTipoMovimento('Gasto')">🔴 Gasto</button>
+            </div>
+
+            <div class="linha-topo-cat">
+                <label>Categoria / Subcategoria</label>
+                <button type="button" class="btn-gerenciar" onclick="alternarPainelCategorias()">⚙️ Gerenciar Categorias</button>
+            </div>
+
+            <!-- Painel Inteligente de Categorias e Subcategorias -->
+            <div id="painelCategorias" class="painel-categorias">
+                <div class="input-nova-cat">
+                    <input type="text" id="novaCatInput" placeholder="Nova Categoria Principal...">
+                    <button type="button" class="btn-add-mini" onclick="adicionarCategoriaPrincipal()">Adicionar</button>
+                </div>
+                <ul id="listaGerenciarCat" class="lista-gerenciar-cat"></ul>
+            </div>
+
+            <select id="categoria" style="margin-top: 2px;"></select>
+
+            <label>Forma de Pagamento</label>
+            <select id="formaPagamento">
+                <option value="Dinheiro">💵 Dinheiro</option>
+                <option value="Pix">💠 Pix</option>
+                <option value="Crédito">💳 Crédito</option>
+                <option value="Débito">💳 Débito</option>
+            </select>
+
+            <label>Valor (R$)</label>
+            <input type="number" id="valor" placeholder="0.00" step="0.01">
+
+            <button onclick="adicionarRegistro()">Adicionar Lançamento</button>
+        </div>
+
+        <!-- Gráfico por Categoria -->
+        <div class="card">
+            <h3>Gráfico por Categoria</h3>
+            <div class="tipo-container" style="margin-top: 4px;">
+                <button type="button" id="btnGraficoGasto" class="btn-tipo ativo-gasto" onclick="mudarTipoGrafico('Gasto')">Gastos</button>
+                <button type="button" id="btnGraficoGanho" class="btn-tipo" onclick="mudarTipoGrafico('Ganho')">Ganhos</button>
+            </div>
+            <div class="chart-container">
+                <canvas id="graficoCategorias"></canvas>
+            </div>
+        </div>
+
+        <!-- Tabela de Histórico -->
+        <div class="card">
+            <h3>Histórico Recente</h3>
+            <table class="historico">
+                <thead>
+                    <tr>
+                        <th>Categoria</th>
+                        <th>Valor</th>
+                        <th>Data/Hora</th>
+                        <th style="text-align:center;">Ação</th>
+                    </tr>
+                </thead>
+                <tbody id="tabelaHistorico">
+                </tbody>
+            </table>
+            <button class="btn-apagar-tudo" onclick="limparDados()">Apagar Todos os Registros</button>
+        </div>
+    </div>
+
+    <script>
+        const defaultGanhos = {
+            "Salário": [],
+            "99Pop": [],
+            "Particular": []
+        };
+        const defaultGastos = {
+            "Alimentação": ["Almoço", "Lanches", "Supermercado", "Mercadinho"],
+            "Moradia": ["Internet", "Luz", "Água"],
+            "Transporte": ["Combustível", "Uber/99", "Manutenção"],
+            "Pessoal": ["Roupa", "Acessórios"],
+            "Lazer": ["Bebidas", "Viagem", "Passeios"]
+        };
+
+        let tipoAtual = "Ganho";
+        let tipoGraficoAtual = "Gasto";
+        let meuGrafico = null;
+        let modalCallback = null;
+
+        let categoriasGanhos = JSON.parse(localStorage.getItem("minhasCatGanhosObj")) || defaultGanhos;
+        let categoriasGastos = JSON.parse(localStorage.getItem("minhasCatGastosObj")) || defaultGastos;
+        let registros = JSON.parse(localStorage.getItem("meusRegistros")) || [];
+
+        // Funções para Modais Personalizados
+        function abrirAlerta(titulo, mensagem) {
+            document.getElementById("modalTitle").textContent = titulo;
+            document.getElementById("modalMessage").textContent = mensagem;
+            document.getElementById("modalInputContainer").style.display = "none";
+            document.getElementById("modalBtnCancel").style.display = "none";
+            document.getElementById("customModal").style.display = "flex";
+            modalCallback = null;
+        }
+
+        function abrirConfirm(titulo, mensagem, callback) {
+            document.getElementById("modalTitle").textContent = titulo;
+            document.getElementById("modalMessage").textContent = mensagem;
+            document.getElementById("modalInputContainer").style.display = "none";
+            document.getElementById("modalBtnCancel").style.display = "block";
+            document.getElementById("customModal").style.display = "flex";
+            modalCallback = callback;
+        }
+
+        function abrirPrompt(titulo, mensagem, callback) {
+            document.getElementById("modalTitle").textContent = titulo;
+            document.getElementById("modalMessage").textContent = mensagem;
+            const inputContainer = document.getElementById("modalInputContainer");
+            inputContainer.style.display = "block";
+            const input = document.getElementById("modalInput");
+            input.value = "";
+            document.getElementById("modalBtnCancel").style.display = "block";
+            document.getElementById("customModal").style.display = "flex";
+            setTimeout(() => input.focus(), 50);
+            modalCallback = callback;
+        }
+
+        function fecharModal(confirmado) {
+            document.getElementById("customModal").style.display = "none";
+            if (modalCallback) {
+                if (document.getElementById("modalInputContainer").style.display === "block") {
+                    const val = document.getElementById("modalInput").value;
+                    modalCallback(confirmado ? val : null);
+                } else {
+                    modalCallback(confirmado);
+                }
+                modalCallback = null;
+            }
+        }
+
+        function setTipoMovimento(tipo) {
+            tipoAtual = tipo;
+            const btnGanho = document.getElementById("btnGanho");
+            const btnGasto = document.getElementById("btnGasto");
+
+            if (tipo === "Ganho") {
+                btnGanho.className = "btn-tipo ativo-ganho";
+                btnGasto.className = "btn-tipo";
+            } else {
+                btnGanho.className = "btn-tipo";
+                btnGasto.className = "btn-tipo ativo-gasto";
+            }
+
+            document.getElementById("painelCategorias").classList.remove("ativo");
+            atualizarCategorias();
+        }
+
+        function mudarTipoGrafico(tipo) {
+            tipoGraficoAtual = tipo;
+            const btnGasto = document.getElementById("btnGraficoGasto");
+            const btnGanho = document.getElementById("btnGraficoGanho");
+
+            if (tipo === "Gasto") {
+                btnGasto.className = "btn-tipo ativo-gasto";
+                btnGanho.className = "btn-tipo";
+            } else {
+                btnGasto.className = "btn-tipo";
+                btnGanho.className = "btn-tipo ativo-ganho";
+            }
+
+            atualizarGrafico();
+        }
+
+        function atualizarCategorias() {
+            const selectCategoria = document.getElementById("categoria");
+            selectCategoria.innerHTML = ""; 
+
+            const objCat = tipoAtual === "Ganho" ? categoriasGanhos : categoriasGastos;
+            
+            Object.keys(objCat).forEach(principal => {
+                let optPrincipal = document.createElement("option");
+                optPrincipal.value = principal;
+                optPrincipal.textContent = principal;
+                selectCategoria.appendChild(optPrincipal);
+
+                objCat[principal].forEach(sub => {
+                    let optSub = document.createElement("option");
+                    optSub.value = `${principal} › ${sub}`;
+                    optSub.textContent = `  ↳ ${sub} (${principal})`;
+                    selectCategoria.appendChild(optSub);
+                });
+            });
+            
+            atualizarListaGerenciamento();
+        }
+
+        function alternarPainelCategorias() {
+            const painel = document.getElementById("painelCategorias");
+            painel.classList.toggle("ativo");
+            if (painel.classList.contains("ativo")) {
+                atualizarListaGerenciamento();
+            }
+        }
+
+        function atualizarListaGerenciamento() {
+            const listaUl = document.getElementById("listaGerenciarCat");
+            listaUl.innerHTML = "";
+
+            const objCat = tipoAtual === "Ganho" ? categoriasGanhos : categoriasGastos;
+
+            Object.keys(objCat).forEach(principal => {
+                const li = document.createElement("li");
+                li.className = "item-gerenciar-cat";
+                
+                let subHtml = "";
+                objCat[principal].forEach(sub => {
+                    subHtml += `
+                        <div class="item-subcat">
+                            <span>↳ ${sub}</span>
+                            <button type="button" class="btn-acao-mini btn-del-cat" onclick="excluirSubcategoria('${principal}', '${sub}')" title="Excluir Subcategoria">❌</button>
+                        </div>
+                    `;
+                });
+
+                li.innerHTML = `
+                    <div class="item-principal" onclick="toggleSubBox(this)">
+                        <span style="font-weight: 600;">📁 ${principal} <span style="font-size:8px; color:#94a3b8;">(Toque p/ subcategorias ▼)</span></span>
+                        <div class="btn-acoes-cat" onclick="event.stopPropagation()">
+                            <button type="button" class="btn-acao-mini btn-add-sub" onclick="adicionarSubcategoriaPrompt('${principal}')" title="Adicionar Subcategoria">+ Sub</button>
+                            <button type="button" class="btn-acao-mini btn-del-cat" onclick="excluirCategoriaPrincipal('${principal}')" title="Excluir Categoria">🗑️</button>
+                        </div>
+                    </div>
+                    <div class="subcategorias-box">
+                        ${subHtml ? subHtml : '<div style="font-size:9px; color:#94a3b8; font-style:italic; padding:2px 0;">Nenhuma subcategoria cadastrada.</div>'}
+                    </div>
+                `;
+                listaUl.appendChild(li);
+            });
+        }
+
+        // Faz as subcategorias aparecerem/subirem ao tocar na categoria principal
+        function toggleSubBox(element) {
+            const box = element.nextElementSibling;
+            if (box.style.display === "block") {
+                box.style.display = "none";
+            } else {
+                box.style.display = "block";
+            }
+        }
+
+        function adicionarCategoriaPrincipal() {
+            const input = document.getElementById("novaCatInput");
+            const nome = input.value.trim();
+
+            if (!nome) {
+                abrirAlerta("Atenção", "Digite o nome da categoria.");
+                return;
+            }
+
+            const objCat = tipoAtual === "Ganho" ? categoriasGanhos : categoriasGastos;
+
+            if (objCat[nome]) {
+                abrirAlerta("Atenção", "Essa categoria já existe!");
+                return;
+            }
+
+            objCat[nome] = [];
+            salvarCategoriasLocalStorage();
+            input.value = "";
+            atualizarCategorias();
+            document.getElementById("painelCategorias").classList.add("ativo");
+        }
+
+        function adicionarSubcategoriaPrompt(principal) {
+            abrirPrompt("Nova Subcategoria", `Adicionar subcategoria dentro de "${principal}":`, (subNome) => {
+                if (!subNome || subNome.trim() === "") return;
+
+                const nomeLimpo = subNome.trim();
+                const objCat = tipoAtual === "Ganho" ? categoriasGanhos : categoriasGastos;
+
+                if (objCat[principal].includes(nomeLimpo)) {
+                    abrirAlerta("Atenção", "Essa subcategoria já existe nesta categoria!");
+                    return;
+                }
+
+                objCat[principal].push(nomeLimpo);
+                salvarCategoriasLocalStorage();
+                atualizarCategorias();
+                document.getElementById("painelCategorias").classList.add("ativo");
+            });
+        }
+
+        function excluirSubcategoria(principal, sub) {
+            abrirConfirm("Excluir Subcategoria", `Deseja excluir a subcategoria "${sub}"?`, (confirmado) => {
+                if (confirmado) {
+                    const objCat = tipoAtual === "Ganho" ? categoriasGanhos : categoriasGastos;
+                    objCat[principal] = objCat[principal].filter(s => s !== sub);
+                    salvarCategoriasLocalStorage();
+                    atualizarCategorias();
+                    document.getElementById("painelCategorias").classList.add("ativo");
+                }
+            });
+        }
+
+        function excluirCategoriaPrincipal(principal) {
+            const objCat = tipoAtual === "Ganho" ? categoriasGanhos : categoriasGastos;
+            const chaves = Object.keys(objCat);
+
+            if (chaves.length <= 1) {
+                abrirAlerta("Atenção", "Você precisa manter pelo menos uma categoria principal!");
+                return;
+            }
+
+            abrirConfirm("Excluir Categoria", `Deseja excluir a categoria principal "${principal}" e suas subcategorias? Os lançamentos antigos não serão apagados.`, (confirmado) => {
+                if (confirmado) {
+                    delete objCat[principal];
+                    salvarCategoriasLocalStorage();
+                    atualizarCategorias();
+                    document.getElementById("painelCategorias").classList.add("ativo");
+                }
+            });
+        }
+
+        function salvarCategoriasLocalStorage() {
+            if (tipoAtual === "Ganho") {
+                localStorage.setItem("minhasCatGanhosObj", JSON.stringify(categoriasGanhos));
+            } else {
+                localStorage.setItem("minhasCatGastosObj", JSON.stringify(categoriasGastos));
+            }
+        }
+
+        function adicionarRegistro() {
+            const categoria = document.getElementById("categoria").value;
+            const formaPagamento = document.getElementById("formaPagamento").value;
+            const valor = parseFloat(document.getElementById("valor").value);
+
+            if (!categoria) {
+                abrirAlerta("Atenção", "Selecione uma categoria!");
+                return;
+            }
+
+            if (!valor || valor <= 0) {
+                abrirAlerta("Atenção", "Por favor, digite um valor válido!");
+                return;
+            }
+
+            const agora = new Date();
+            const dataFormatada = agora.toLocaleDateString("pt-BR");
+            const horaFormatada = agora.toLocaleTimeString("pt-BR", {hour: '2-digit', minute:'2-digit'});
+
+            const novoRegistro = { 
+                tipo: tipoAtual, 
+                categoria, 
+                formaPagamento, 
+                valor, 
+                data: dataFormatada, 
+                hora: horaFormatada 
+            };
+            
+            registros.push(novoRegistro);
+            localStorage.setItem("meusRegistros", JSON.stringify(registros));
+            
+            document.getElementById("valor").value = ""; 
+            atualizarTela();
+        }
+
+        function deletarRegistro(index) {
+            abrirConfirm("Excluir Lançamento", "Deseja apagar este lançamento específico?", (confirmado) => {
+                if (confirmado) {
+                    registros.splice(index, 1);
+                    localStorage.setItem("meusRegistros", JSON.stringify(registros));
+                    atualizarTela();
+                }
+            });
+        }
+
+        function limparDados() {
+            abrirConfirm("Apagar Tudo", "ATENÇÃO: Deseja apagar TODOS os registros da memória?", (confirmado) => {
+                if (confirmado) {
+                    registros = [];
+                    localStorage.removeItem("meusRegistros");
+                    atualizarTela();
+                }
+            });
+        }
+
+        function atualizarGrafico() {
+            const ctx = document.getElementById('graficoCategorias').getContext('2d');
+            
+            const registrosFiltrados = registros.filter(r => r.tipo === tipoGraficoAtual);
+            
+            const somas = {};
+            registrosFiltrados.forEach(r => {
+                let catPrincipal = r.categoria.includes(" › ") ? r.categoria.split(" › ")[0] : r.categoria;
+                somas[catPrincipal] = (somas[catPrincipal] || 0) + r.valor;
+            });
+
+            const categorias = Object.keys(somas);
+            const valores = Object.values(somas);
+
+            if (meuGrafico) {
+                meuGrafico.destroy();
+            }
+
+            const coresPaleta = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16', '#14b8a6', '#64748b'];
+
+            meuGrafico = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: categorias.length > 0 ? categorias : ['Sem registros'],
+                    datasets: [{
+                        data: valores.length > 0 ? valores : [1],
+                        backgroundColor: categorias.length > 0 ? coresPaleta.slice(0, categorias.length) : ['#e2e8f0'],
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                boxWidth: 8,
+                                font: { size: 9 }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function atualizarTela() {
+            const tabela = document.getElementById("tabelaHistorico");
+            tabela.innerHTML = "";
+
+            let ganhos = 0;
+            let gastos = 0;
+
+            for (let i = registros.length - 1; i >= 0; i--) {
+                const reg = registros[i];
+                
+                if (reg.tipo === "Ganho") ganhos += reg.valor;
+                else gastos += reg.valor;
+
+                const tr = document.createElement("tr");
+                const corTexto = reg.tipo === "Ganho" ? "#059669" : "#dc2626";
+                const exibicaoPagamento = reg.formaPagamento ? `<br><span class="forma-pagto">${reg.formaPagamento}</span>` : "";
+                
+                tr.innerHTML = `
+                    <td style="font-weight: 500;">
+                        ${reg.categoria}
+                        ${exibicaoPagamento}
+                    </td>
+                    <td style="color: ${corTexto}; font-weight: 600;">R$ ${reg.valor.toFixed(2)}</td>
+                    <td class="data-hora">${reg.data}<br>${reg.hora}</td>
+                    <td style="text-align: center;">
+                        <button class="btn-del" onclick="deletarRegistro(${i})" title="Apagar item">🗑️</button>
+                    </td>
+                `;
+                tabela.appendChild(tr);
+            }
+
+            const saldo = ganhos - gastos;
+            
+            document.getElementById("totalGanhos").textContent = `R$ ${ganhos.toFixed(2)}`;
+            document.getElementById("totalGastos").textContent = `R$ ${gastos.toFixed(2)}`;
+            
+            const saldoEl = document.getElementById("saldoAtual");
+            saldoEl.textContent = `R$ ${saldo.toFixed(2)}`;
+            saldoEl.style.color = saldo >= 0 ? "#059669" : "#dc2626";
+
+            atualizarGrafico();
+        }
+
+        // Inicializa o app
+        atualizarCategorias();
+        atualizarTela();
+    </script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+{
+  "name":"Ganhos & Gastos",
+  "short_name":"Ganhos & Gastos",
+  "description":"Controle financeiro com sincronização entre dispositivos",
+  "start_url":"./",
+  "scope":"./",
+  "display":"standalone",
+  "background_color":"#f4fbf6",
+  "theme_color":"#16a34a",
+  "icons":[{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+}

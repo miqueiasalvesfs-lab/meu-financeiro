@@ -1,5 +1,6 @@
 package com.ganhosegastos.app;
 
+import android.annotation.TargetApi;
 import android.app.Activity;
 import android.content.ContentValues;
 import android.content.Context;
@@ -39,12 +40,11 @@ public class MainActivity extends Activity {
     private static final String APP_HOST = "appassets.androidplatform.net";
     private static final String PREFS = "ganhos_gastos_security";
     private static final String PREF_BIOMETRIC = "biometric_enabled";
-    private static final long EXIT_BACK_WINDOW_MS = 2000L;
     private boolean resumedOnce = false;
     private long pausedAt = 0L;
     private boolean biometricPromptShowing = false;
     private CancellationSignal biometricCancellation = null;
-    private long lastExitBackAt = 0L;
+    private long lastBackPressedAt = 0L;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -96,7 +96,17 @@ public class MainActivity extends Activity {
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) { return handleNavigation(request.getUrl()); }
             @Override @SuppressWarnings("deprecation") public boolean shouldOverrideUrlLoading(WebView view, String url) { return handleNavigation(Uri.parse(url)); }
         });
+
+        if (Build.VERSION.SDK_INT >= 33) registerModernBackCallback();
         webView.loadUrl("https://" + APP_HOST + "/assets/index.html");
+    }
+
+    @TargetApi(33)
+    private void registerModernBackCallback() {
+        getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,
+                this::handleSystemBack
+        );
     }
 
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
@@ -183,7 +193,6 @@ public class MainActivity extends Activity {
 
                 @Override public void onAuthenticationFailed() {
                     super.onAuthenticationFailed();
-                    // O prompt continua aberto para uma nova tentativa. Não inicia outro leitor aqui.
                 }
             });
         } catch (Exception e) {
@@ -191,55 +200,41 @@ public class MainActivity extends Activity {
         }
     }
 
-    private boolean isMainAppPage() {
-        if (webView == null) return false;
-        String url = webView.getUrl();
-        return url != null && url.contains("/assets/index.html");
-    }
-
-    private void requestExitWithDoubleBack() {
-        long now = System.currentTimeMillis();
-        if (now - lastExitBackAt <= EXIT_BACK_WINDOW_MS) {
-            lastExitBackAt = 0L;
-            finish();
-        } else {
-            lastExitBackAt = now;
-            Toast.makeText(this, "Pressione Voltar novamente para sair", Toast.LENGTH_SHORT).show();
+    private void handleSystemBack() {
+        if (biometricPromptShowing) return;
+        if (webView == null) {
+            requestDoubleBackExit();
+            return;
         }
-    }
 
-    @Override public void onBackPressed() {
-        if (webView == null) return;
-
-        String script = "(function(){try{" +
-                "var bio=document.getElementById('bioLock');if(bio&&!bio.classList.contains('hide'))return 'handled';" +
-                "var opt=document.getElementById('optSheet');if(opt&&opt.classList.contains('on')){if(window.handleAppBack)window.handleAppBack();return 'handled';}" +
-                "var cat=document.getElementById('catSheet');if(cat&&cat.classList.contains('on')){if(window.handleAppBack)window.handleAppBack();return 'handled';}" +
-                "var launch=document.getElementById('launchModal');if(launch&&launch.classList.contains('on')){if(window.handleAppBack)window.handleAppBack();return 'handled';}" +
-                "var panel=document.querySelector('.setting-expand-panel.open');if(panel){if(window.handleAppBack)window.handleAppBack();return 'handled';}" +
-                "var before=(document.querySelector('.nav .on')||{}).dataset?.tab||'home';" +
-                "if(window.handleAppBack)window.handleAppBack();" +
-                "var after=(document.querySelector('.nav .on')||{}).dataset?.tab||'home';" +
-                "if(after!==before)return 'handled';" +
-                "if(before!=='home')return 'handled';" +
-                "return 'exit';" +
-                "}catch(e){return 'exit'}})()";
-
-        webView.evaluateJavascript(script, result -> {
-            String action = result == null ? "" : result.replace("\"", "");
-            if ("handled".equals(action)) {
-                lastExitBackAt = 0L;
+        String js = "(function(){try{return window.handleAndroidBack?window.handleAndroidBack():'root'}catch(e){return 'root'}})()";
+        webView.evaluateJavascript(js, result -> {
+            String state = result == null ? "root" : result.replace("\"", "");
+            if ("handled".equals(state)) {
+                lastBackPressedAt = 0L;
                 return;
             }
-
-            if (!isMainAppPage() && webView.canGoBack()) {
-                lastExitBackAt = 0L;
+            if (webView.canGoBack()) {
+                lastBackPressedAt = 0L;
                 webView.goBack();
                 return;
             }
-
-            requestExitWithDoubleBack();
+            requestDoubleBackExit();
         });
+    }
+
+    private void requestDoubleBackExit() {
+        long now = System.currentTimeMillis();
+        if (lastBackPressedAt > 0 && now - lastBackPressedAt <= 2000) {
+            finish();
+            return;
+        }
+        lastBackPressedAt = now;
+        Toast.makeText(this, "Pressione Voltar novamente para sair", Toast.LENGTH_SHORT).show();
+    }
+
+    @Override @SuppressWarnings("deprecation") public void onBackPressed() {
+        handleSystemBack();
     }
 
     public class AndroidBridge {

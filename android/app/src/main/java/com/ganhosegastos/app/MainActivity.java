@@ -39,10 +39,12 @@ public class MainActivity extends Activity {
     private static final String APP_HOST = "appassets.androidplatform.net";
     private static final String PREFS = "ganhos_gastos_security";
     private static final String PREF_BIOMETRIC = "biometric_enabled";
+    private static final long EXIT_BACK_WINDOW_MS = 2000L;
     private boolean resumedOnce = false;
     private long pausedAt = 0L;
     private boolean biometricPromptShowing = false;
     private CancellationSignal biometricCancellation = null;
+    private long lastExitBackAt = 0L;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -189,15 +191,54 @@ public class MainActivity extends Activity {
         }
     }
 
+    private boolean isMainAppPage() {
+        if (webView == null) return false;
+        String url = webView.getUrl();
+        return url != null && url.contains("/assets/index.html");
+    }
+
+    private void requestExitWithDoubleBack() {
+        long now = System.currentTimeMillis();
+        if (now - lastExitBackAt <= EXIT_BACK_WINDOW_MS) {
+            lastExitBackAt = 0L;
+            finish();
+        } else {
+            lastExitBackAt = now;
+            Toast.makeText(this, "Pressione Voltar novamente para sair", Toast.LENGTH_SHORT).show();
+        }
+    }
+
     @Override public void onBackPressed() {
         if (webView == null) return;
-        webView.evaluateJavascript("(function(){try{return window.handleAppBack?!!window.handleAppBack():false}catch(e){return false}})()", result -> {
-            if ("true".equals(result)) return;
-            if (webView.canGoBack()) {
-                webView.goBack();
-            } else {
-                webView.evaluateJavascript("window.tab&&window.tab('home',false)", null);
+
+        String script = "(function(){try{" +
+                "var bio=document.getElementById('bioLock');if(bio&&!bio.classList.contains('hide'))return 'handled';" +
+                "var opt=document.getElementById('optSheet');if(opt&&opt.classList.contains('on')){if(window.handleAppBack)window.handleAppBack();return 'handled';}" +
+                "var cat=document.getElementById('catSheet');if(cat&&cat.classList.contains('on')){if(window.handleAppBack)window.handleAppBack();return 'handled';}" +
+                "var launch=document.getElementById('launchModal');if(launch&&launch.classList.contains('on')){if(window.handleAppBack)window.handleAppBack();return 'handled';}" +
+                "var panel=document.querySelector('.setting-expand-panel.open');if(panel){if(window.handleAppBack)window.handleAppBack();return 'handled';}" +
+                "var before=(document.querySelector('.nav .on')||{}).dataset?.tab||'home';" +
+                "if(window.handleAppBack)window.handleAppBack();" +
+                "var after=(document.querySelector('.nav .on')||{}).dataset?.tab||'home';" +
+                "if(after!==before)return 'handled';" +
+                "if(before!=='home')return 'handled';" +
+                "return 'exit';" +
+                "}catch(e){return 'exit'}})()";
+
+        webView.evaluateJavascript(script, result -> {
+            String action = result == null ? "" : result.replace("\"", "");
+            if ("handled".equals(action)) {
+                lastExitBackAt = 0L;
+                return;
             }
+
+            if (!isMainAppPage() && webView.canGoBack()) {
+                lastExitBackAt = 0L;
+                webView.goBack();
+                return;
+            }
+
+            requestExitWithDoubleBack();
         });
     }
 

@@ -1,7 +1,7 @@
 package com.ganhosegastos.app;
 
 import android.app.Activity;
-import android.app.PrintManager;
+import android.print.PrintManager;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
@@ -35,14 +35,29 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         webView = new WebView(this);
+        webView.setVerticalScrollBarEnabled(false);
+        webView.setHorizontalScrollBarEnabled(false);
         setContentView(webView);
-        assetLoader = new WebViewAssetLoader.Builder().addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this)).build();
+
+        assetLoader = new WebViewAssetLoader.Builder()
+                .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
+                .build();
+
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
         settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(false);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+        settings.setTextZoom(100);
+        settings.setSupportZoom(false);
+        settings.setBuiltInZoomControls(false);
+        settings.setDisplayZoomControls(false);
+        settings.setUseWideViewPort(true);
+        settings.setLoadWithOverviewMode(false);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+        }
+
         webView.setWebChromeClient(new WebChromeClient());
         webView.addJavascriptInterface(new AndroidBridge(this, webView), "AndroidBridge");
         webView.setWebViewClient(new WebViewClient() {
@@ -66,14 +81,73 @@ public class MainActivity extends Activity {
         return false;
     }
 
-    @Override public void onBackPressed() { if (webView != null && webView.canGoBack()) webView.goBack(); else super.onBackPressed(); }
+    @Override public void onBackPressed() {
+        if (webView != null && webView.canGoBack()) webView.goBack();
+        else super.onBackPressed();
+    }
 
     public static class AndroidBridge {
-        private final Activity activity; private final WebView webView;
-        AndroidBridge(Activity activity, WebView webView) { this.activity = activity; this.webView = webView; }
-        @JavascriptInterface public void openExternal(String url) { activity.runOnUiThread(() -> { try { Uri uri=Uri.parse(url); String scheme=uri.getScheme(); if ("http".equalsIgnoreCase(scheme)||"https".equalsIgnoreCase(scheme)) activity.startActivity(new Intent(Intent.ACTION_VIEW,uri)); } catch(Exception e){ Toast.makeText(activity,"Não foi possível abrir o link.",Toast.LENGTH_SHORT).show(); } }); }
-        @JavascriptInterface public void printPage() { activity.runOnUiThread(() -> { PrintManager pm=(PrintManager)activity.getSystemService(Context.PRINT_SERVICE); if(pm!=null) pm.print("Ganhos_Gastos_Relatorio",webView.createPrintDocumentAdapter("Ganhos & Gastos"),null); }); }
-        @JavascriptInterface public void saveFile(String fileName,String base64Data,String mimeType) { new Thread(() -> { try { byte[] bytes=Base64.decode(base64Data,Base64.DEFAULT); if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.Q){ ContentValues values=new ContentValues(); values.put(MediaStore.MediaColumns.DISPLAY_NAME,sanitize(fileName)); values.put(MediaStore.MediaColumns.MIME_TYPE,mimeType); values.put(MediaStore.MediaColumns.RELATIVE_PATH,Environment.DIRECTORY_DOWNLOADS+"/GanhosGastos"); Uri uri=activity.getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI,values); if(uri==null)throw new Exception("Falha ao criar arquivo"); try(OutputStream out=activity.getContentResolver().openOutputStream(uri)){ if(out==null)throw new Exception("Falha ao abrir arquivo"); out.write(bytes); } }else{ File dir=new File(activity.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS),"GanhosGastos"); if(!dir.exists()&&!dir.mkdirs())throw new Exception("Falha ao criar pasta"); File file=new File(dir,sanitize(fileName)); try(OutputStream out=new FileOutputStream(file)){out.write(bytes);} } activity.runOnUiThread(() -> Toast.makeText(activity,"Arquivo salvo em Downloads/GanhosGastos",Toast.LENGTH_LONG).show()); }catch(Exception e){ activity.runOnUiThread(() -> Toast.makeText(activity,"Não foi possível salvar o arquivo.",Toast.LENGTH_LONG).show()); } }).start(); }
-        private static String sanitize(String name){return name==null?"arquivo":name.replaceAll("[^a-zA-Z0-9._-]","_");}
+        private final Activity activity;
+        private final WebView webView;
+
+        AndroidBridge(Activity activity, WebView webView) {
+            this.activity = activity;
+            this.webView = webView;
+        }
+
+        @JavascriptInterface public void openExternal(String url) {
+            activity.runOnUiThread(() -> {
+                try {
+                    Uri uri = Uri.parse(url);
+                    String scheme = uri.getScheme();
+                    if ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme)) {
+                        activity.startActivity(new Intent(Intent.ACTION_VIEW, uri));
+                    }
+                } catch (Exception e) {
+                    Toast.makeText(activity, "Não foi possível abrir o link.", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+
+        @JavascriptInterface public void printPage() {
+            activity.runOnUiThread(() -> {
+                PrintManager pm = (PrintManager) activity.getSystemService(Context.PRINT_SERVICE);
+                if (pm != null) {
+                    pm.print("Ganhos_Gastos_Relatorio", webView.createPrintDocumentAdapter("Ganhos & Gastos"), null);
+                }
+            });
+        }
+
+        @JavascriptInterface public void saveFile(String fileName, String base64Data, String mimeType) {
+            new Thread(() -> {
+                try {
+                    byte[] bytes = Base64.decode(base64Data, Base64.DEFAULT);
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        ContentValues values = new ContentValues();
+                        values.put(MediaStore.MediaColumns.DISPLAY_NAME, sanitize(fileName));
+                        values.put(MediaStore.MediaColumns.MIME_TYPE, mimeType);
+                        values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/GanhosGastos");
+                        Uri uri = activity.getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+                        if (uri == null) throw new Exception("Falha ao criar arquivo");
+                        try (OutputStream out = activity.getContentResolver().openOutputStream(uri)) {
+                            if (out == null) throw new Exception("Falha ao abrir arquivo");
+                            out.write(bytes);
+                        }
+                    } else {
+                        File dir = new File(activity.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "GanhosGastos");
+                        if (!dir.exists() && !dir.mkdirs()) throw new Exception("Falha ao criar pasta");
+                        File file = new File(dir, sanitize(fileName));
+                        try (OutputStream out = new FileOutputStream(file)) { out.write(bytes); }
+                    }
+                    activity.runOnUiThread(() -> Toast.makeText(activity, "Arquivo salvo em Downloads/GanhosGastos", Toast.LENGTH_LONG).show());
+                } catch (Exception e) {
+                    activity.runOnUiThread(() -> Toast.makeText(activity, "Não foi possível salvar o arquivo.", Toast.LENGTH_LONG).show());
+                }
+            }).start();
+        }
+
+        private static String sanitize(String name) {
+            return name == null ? "arquivo" : name.replaceAll("[^a-zA-Z0-9._-]", "_");
+        }
     }
 }

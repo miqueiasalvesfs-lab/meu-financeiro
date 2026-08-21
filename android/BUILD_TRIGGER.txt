@@ -1,0 +1,1 @@
+Build do APK Android instalável fora da Play Store.

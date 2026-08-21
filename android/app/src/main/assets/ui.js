@@ -1,4 +1,8 @@
-function tab(id){
+let navStack=['home'],navFromBack=false;
+function currentTab(){return document.querySelector('.nav .on')?.dataset.tab||'home'}
+function tab(id,record=true){
+  let cur=currentTab();
+  if(record&&id!==cur){if(navStack[navStack.length-1]!==cur)navStack.push(cur);navStack.push(id);if(navStack.length>20)navStack=navStack.slice(-20)}
   document.querySelectorAll('.page').forEach(p=>p.classList.toggle('on',p.id===id));
   document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===id));
   if(id==='report'||id==='history')render();
@@ -28,6 +32,20 @@ function closeLaunch(){
 $('fabLaunch').onclick=()=>openLaunch(false);
 $('closeLaunch').onclick=()=>{reset();closeLaunch()};
 document.querySelectorAll('[data-close-launch]').forEach(x=>x.onclick=()=>{reset();closeLaunch()});
+
+window.handleAppBack=()=>{
+  if($('bioLock')&&!$('bioLock').classList.contains('hide'))return true;
+  if($('optSheet')?.classList.contains('on')){$('optSheet').classList.remove('on');return true}
+  if($('catSheet')?.classList.contains('on')){$('catSheet').classList.remove('on');return true}
+  if($('launchModal')?.classList.contains('on')){reset();closeLaunch();return true}
+  let openSetting=document.querySelector('.setting-expand-panel.open');if(openSetting){openSetting.classList.remove('open');let btn=document.querySelector(`[data-settings-toggle="${openSetting.id}"]`);btn?.classList.remove('open');btn?.setAttribute('aria-expanded','false');return true}
+  let cur=currentTab();
+  while(navStack.length&&navStack[navStack.length-1]===cur)navStack.pop();
+  let prev=navStack.pop();
+  if(prev&&prev!==cur){tab(prev,false);return true}
+  if(cur!=='home'){tab('home',false);return true}
+  return true
+};
 
 function setType(t){
   type=t;$('bg').className='g '+(t==='gain'?'on':'');$('be').className='r '+(t==='expense'?'on':'');
@@ -129,6 +147,6 @@ $('sync').onclick=logoutLocal;window.addEventListener('online',()=>user&&syncClo
 function swipe(){
   let x=0,y=0,ok=false,o=['home','report','history','settings'];
   document.querySelector('.app').addEventListener('touchstart',e=>{if(e.target.closest('input,.sheetbg,.profile-card,.theme-grid,.security-row,.settings-panel'))return;let t=e.changedTouches[0];x=t.clientX;y=t.clientY;ok=true},{passive:true});
-  document.querySelector('.app').addEventListener('touchend',e=>{if(!ok)return;ok=false;let t=e.changedTouches[0],dx=t.clientX-x,dy=t.clientY-y;if(Math.abs(dx)<20||Math.abs(dy)>95)return;let c=document.querySelector('.nav .on')?.dataset.tab||'home',i=o.indexOf(c);if(dx<0&&i<o.length-1)tab(o[i+1]);if(dx>0&&i>0)tab(o[i-1])},{passive:true})
+  document.querySelector('.app').addEventListener('touchend',e=>{if(!ok)return;ok=false;let t=e.changedTouches[0],dx=t.clientX-x,dy=t.clientY-y;if(Math.abs(dx)<20||Math.abs(dy)>95)return;let c=currentTab(),i=o.indexOf(c);if(dx<0&&i<o.length-1)tab(o[i+1]);if(dx>0&&i>0)tab(o[i-1])},{passive:true})
 }
 let n=now();month=hmonth=n.m;$('date').value=n.d;$('time').value=n.t;$('today').textContent=new Intl.DateTimeFormat('pt-BR',{weekday:'long',day:'2-digit',month:'long'}).format(new Date);catDisplay();render();swipe();if('serviceWorker'in navigator&&!window.AndroidBridge)navigator.serviceWorker.register('./sw.js');

@@ -1,0 +1,11 @@
+# Android/Gradle
+.gradle/
+**/build/
+android/local.properties
+android/*.keystore
+android/*.jks
+
+# Secrets
+.env
+*.keystore
+*.jks

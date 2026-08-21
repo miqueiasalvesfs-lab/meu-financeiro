@@ -1,0 +1,30 @@
+name: Temp Export APK Chunks
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+
+jobs:
+  export:
+    if: github.event.issue.title == 'EXPORT_MEULEMBRETE_APK'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: build/meu-lembrete-apk-v3
+          fetch-depth: 0
+      - name: Split APK as base64 text chunks
+        shell: bash
+        run: |
+          rm -rf dist/chunks
+          mkdir -p dist/chunks
+          base64 -w0 dist/Meu-Lembrete-Android.apk | fold -w 4000 | split -d -a 2 -l 1 - dist/chunks/chunk-
+          ls -l dist/chunks
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -f dist/chunks
+          git commit -m 'Temp: export APK chunks' || true
+          git push origin HEAD:build/meu-lembrete-apk-v3

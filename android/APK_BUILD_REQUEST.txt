@@ -1,0 +1,1 @@
+Gerar APK instalável do Ganhos & Gastos fora da Play Store.

@@ -50,6 +50,7 @@
 .launch-sheet-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin:3px 0 12px}
 .launch-title{font-size:20px}.close-launch{width:38px;height:38px;border:0;border-radius:13px;background:#f1f5f9;color:#475569;font-size:24px;line-height:1}
 .launch-modal .field{margin-bottom:11px}
+.sheetbg{z-index:120}
 body.modal-open{overflow:hidden}
 
 /* Configurações modernas */

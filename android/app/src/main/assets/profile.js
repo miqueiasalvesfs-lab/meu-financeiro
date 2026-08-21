@@ -147,3 +147,4 @@ if($('bioToggle'))$('bioToggle').onchange=e=>{let on=e.target.checked;if(!bioSup
 
 window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change',()=>{if(P?.appearance==='system')applyTheme()});
 enhanceSettingsMenus();applyTheme();applyHomePreferences();renderProfile();
+(function(){let s=document.createElement('script');s.src='finance-enhancements.js';s.async=false;document.body.appendChild(s)})();

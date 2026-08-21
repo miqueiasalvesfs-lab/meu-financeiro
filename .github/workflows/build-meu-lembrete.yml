@@ -15,6 +15,9 @@ on:
       - '.github/workflows/build-meu-lembrete.yml'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -40,16 +43,51 @@ jobs:
         with:
           gradle-version: '8.11.1'
 
-      - name: Build debug APK
-        run: gradle -p meu-lembrete-android :app:assembleDebug --stacktrace
+      - name: Build debug APK and capture log
+        id: build_apk
+        shell: bash
+        run: |
+          set +e
+          gradle -p meu-lembrete-android :app:assembleDebug --stacktrace 2>&1 | tee meu-lembrete-build.log
+          code=${PIPESTATUS[0]}
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
 
-      - name: Rename APK
-        run: cp meu-lembrete-android/app/build/outputs/apk/debug/app-debug.apk Meu-Lembrete-Android.apk
+      - name: Prepare build result
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp meu-lembrete-build.log dist/build.log
+          if [ "${{ steps.build_apk.outputs.exit_code }}" = "0" ] && [ -f meu-lembrete-android/app/build/outputs/apk/debug/app-debug.apk ]; then
+            cp meu-lembrete-android/app/build/outputs/apk/debug/app-debug.apk dist/Meu-Lembrete-Android.apk
+            printf 'SUCCESS\n' > dist/build-status.txt
+          else
+            rm -f dist/Meu-Lembrete-Android.apk
+            printf 'FAILED\n' > dist/build-status.txt
+          fi
 
-      - name: Upload APK
+      - name: Publish result to build branch
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- dist/build-status.txt dist/build.log
+          if [ -f dist/Meu-Lembrete-Android.apk ]; then
+            git add -- dist/Meu-Lembrete-Android.apk
+          fi
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "Build: resultado do APK Meu Lembrete [skip ci]"
+          git push origin HEAD:build/meu-lembrete-apk
+
+      - name: Upload APK artifact
+        if: steps.build_apk.outputs.exit_code == '0'
         uses: actions/upload-artifact@v4
         with:
           name: Meu-Lembrete-Android
-          path: Meu-Lembrete-Android.apk
+          path: meu-lembrete-android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 7

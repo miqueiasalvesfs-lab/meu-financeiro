@@ -20,6 +20,11 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+      - name: Check JavaScript syntax
+        run: |
+          node --check android/app/src/main/assets/auth.js
+          node --check android/app/src/main/assets/ui.js
+          node --check android/app/src/main/assets/profile.js
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

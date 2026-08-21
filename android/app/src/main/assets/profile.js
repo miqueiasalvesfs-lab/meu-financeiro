@@ -34,6 +34,25 @@ function applyHomePreferences(){
   if($('defaultPayTxt'))$('defaultPayTxt').textContent=P.defaultPay||'Pix'
 }
 
+function applyBrandingAndDate(){
+  document.title='Do Seu Jeito';
+  let brand=document.querySelector('.brand h1');if(brand)brand.textContent='Do Seu Jeito';
+  let logo=document.querySelector('.brand .logo img');if(logo)logo.alt='Ícone Do Seu Jeito';
+  let lockTitle=document.querySelector('.bio-lock-card h2');if(lockTitle)lockTitle.textContent='Do Seu Jeito bloqueado';
+  let top=document.querySelector('.top > div');
+  if(top){
+    let day=top.querySelector('b'),date=$('today'),d=new Date();
+    if(day)day.textContent=new Intl.DateTimeFormat('pt-BR',{weekday:'long'}).format(d);
+    if(date)date.textContent=new Intl.DateTimeFormat('pt-BR',{day:'2-digit',month:'long',year:'numeric'}).format(d);
+    top.classList.add('date-only-header');
+  }
+  if(!document.getElementById('dateHeaderStyle')){
+    let st=document.createElement('style');st.id='dateHeaderStyle';
+    st.textContent='.top .date-only-header{display:flex;flex-direction:column;gap:2px;align-items:flex-start}.top .date-only-header>b{font-size:19px;line-height:1.1;text-transform:capitalize;font-weight:850}.top .date-only-header>#today{display:block;font-size:15px;line-height:1.2;font-weight:650;opacity:.88;margin-top:2px}.brand h1{letter-spacing:-.02em}';
+    document.head.appendChild(st);
+  }
+}
+
 function toggleSettingsPanel(id,force){let p=$(id);if(!p)return;let open=typeof force==='boolean'?force:!p.classList.contains('open');p.classList.toggle('open',open);let btn=document.querySelector(`[data-settings-toggle="${id}"]`);if(btn){btn.classList.toggle('open',open);btn.setAttribute('aria-expanded',String(open))}}
 function enhanceSettingsMenus(){
   if(document.body.dataset.settingsEnhanced)return;document.body.dataset.settingsEnhanced='1';
@@ -58,7 +77,7 @@ function enhanceSettingsMenus(){
 function renderProfile(){
   P={...PROFILE_DEFAULTS,...(P||{})};
   let name=currentProfileName(),email=user?.email||'—';
-  let topName=document.querySelector('.top > div > b');if(topName)topName.textContent=name;
+  applyBrandingAndDate();
   if($('homeUserName'))$('homeUserName').textContent=name;
   if($('settingsDisplayName'))$('settingsDisplayName').textContent=name;
   if($('settingsEmail'))$('settingsEmail').textContent=email;

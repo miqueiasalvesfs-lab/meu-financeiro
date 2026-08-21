@@ -7,6 +7,12 @@ on:
     paths:
       - 'meu-lembrete-android/**'
       - '.github/workflows/build-meu-lembrete.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'meu-lembrete-android/**'
+      - '.github/workflows/build-meu-lembrete.yml'
   workflow_dispatch:
 
 jobs:

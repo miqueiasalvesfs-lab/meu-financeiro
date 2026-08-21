@@ -7,5 +7,6 @@
   load('finance-enhancements-core.js')
     .then(()=>load('currency-fix.js'))
     .then(()=>load('installment-progress.js'))
+    .then(()=>load('installment-amounts.js'))
     .catch(err=>console.error('Falha ao carregar recursos financeiros',err));
 })();

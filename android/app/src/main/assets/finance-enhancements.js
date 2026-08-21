@@ -70,9 +70,67 @@
     }
     return isoDate(d)
   }
-  function amountForInstallment(total,count,index){
-    let cents=Math.max(0,Math.round((+total||0)*100)),base=Math.floor(cents/count),rem=cents-base*count;
-    return (base+(index<rem?1:0))/100
+
+  function parseMoneyToCents(raw){
+    if(typeof raw==='number'&&Number.isFinite(raw))return Math.max(0,Math.round(raw*100));
+    let s=String(raw??'').trim().replace(/\s+/g,'').replace(/^R\$/i,'').replace(/[^0-9,.-]/g,'');
+    if(!s)return 0;
+    let sep='';
+    if(s.includes(','))sep=',';
+    else if(s.includes('.')){
+      let last=s.lastIndexOf('.'),after=s.slice(last+1).replace(/\D/g,''),dots=(s.match(/\./g)||[]).length;
+      if(after.length<=2&&(dots===1||after.length!==3))sep='.';
+    }
+    let intDigits='',decDigits='';
+    if(sep){
+      let pos=s.lastIndexOf(sep);intDigits=s.slice(0,pos).replace(/\D/g,'')||'0';decDigits=s.slice(pos+1).replace(/\D/g,'').slice(0,2);
+    }else intDigits=s.replace(/\D/g,'')||'0';
+    decDigits=(decDigits+'00').slice(0,2);
+    let whole=Number(intDigits||0);if(!Number.isFinite(whole))return 0;
+    return Math.max(0,whole*100+Number(decDigits||0))
+  }
+  function formatCentsInput(cents){
+    cents=Math.max(0,Math.round(+cents||0));
+    return new Intl.NumberFormat('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}).format(cents/100)
+  }
+  function moneyCents(cents){return money((Math.max(0,Math.round(+cents||0)))/100)}
+  function formatMoneyWhileTyping(raw){
+    let s=String(raw??'').replace(/[^0-9,.]/g,'');if(!s)return'';
+    let sep='',pos=-1;
+    if(s.includes(',')){sep=',';pos=s.lastIndexOf(',')}
+    else if(s.includes('.')){
+      let p=s.lastIndexOf('.'),after=s.slice(p+1).replace(/\D/g,''),dots=(s.match(/\./g)||[]).length;
+      if(after.length<=2&&(dots===1||after.length!==3)){sep='.';pos=p}
+    }
+    let intPart=sep?s.slice(0,pos):s,decPart=sep?s.slice(pos+1):'';
+    let intDigits=intPart.replace(/\D/g,'').replace(/^0+(?=\d)/,'')||'0';
+    let grouped=new Intl.NumberFormat('pt-BR',{maximumFractionDigits:0}).format(Number(intDigits||0));
+    if(!sep)return grouped;
+    return grouped+','+decPart.replace(/\D/g,'').slice(0,2)
+  }
+  function setupMoneyInput(){
+    let input=$('value');if(!input||input.dataset.moneyReady)return;
+    input.dataset.moneyReady='1';input.type='text';input.inputMode='decimal';input.setAttribute('inputmode','decimal');input.setAttribute('autocomplete','off');input.placeholder='0,00';
+    input.addEventListener('input',()=>{let before=input.value,formatted=formatMoneyWhileTyping(before);if(input.value!==formatted)input.value=formatted;updateInstallmentPreview()});
+    input.addEventListener('blur',()=>{if(input.value.trim())input.value=formatCentsInput(parseMoneyToCents(input.value));updateInstallmentPreview()});
+  }
+  function installmentBreakdown(totalCents,count){
+    count=Math.max(2,Math.min(360,Math.trunc(+count||2)));totalCents=Math.max(0,Math.round(+totalCents||0));
+    let base=Math.floor(totalCents/count),remainder=totalCents%count;
+    return{count,totalCents,base,remainder,high:base+(remainder?1:0),low:base}
+  }
+  function amountForInstallmentCents(totalCents,count,index){
+    let b=installmentBreakdown(totalCents,count);return b.base+(index<b.remainder?1:0)
+  }
+  function amountForInstallment(total,count,index){return amountForInstallmentCents(parseMoneyToCents(total),count,index)/100}
+  function installmentSplitText(totalCents,count){
+    let b=installmentBreakdown(totalCents,count);
+    if(!b.totalCents)return'Informe o valor total da compra.';
+    if(!b.remainder)return`${b.count} parcelas de ${moneyCents(b.base)} = ${moneyCents(b.totalCents)}`;
+    let lowCount=b.count-b.remainder,parts=[];
+    if(b.remainder)parts.push(`${b.remainder} ${b.remainder===1?'parcela':'parcelas'} de ${moneyCents(b.high)}`);
+    if(lowCount)parts.push(`${lowCount} ${lowCount===1?'parcela':'parcelas'} de ${moneyCents(b.low)}`);
+    return parts.join(' + ')+` = ${moneyCents(b.totalCents)}`
   }
   function installmentState(entry){
     let inst=entry?.installment;if(!inst?.enabled)return null;
@@ -88,11 +146,10 @@
     if($('installmentBox'))return;
     let paymentField=$('payPick')?.closest('.field');if(!paymentField)return;
     let box=document.createElement('div');box.id='installmentBox';box.className='installment-box hide';
-    box.innerHTML=`<label class="installment-toggle"><span><b>Compra parcelada</b><small>Divida este gasto e acompanhe automaticamente quantas parcelas faltam.</small></span><span class="switch"><input id="installmentToggle" type="checkbox"><span></span></span></label><div id="installmentDetails" class="installment-details hide"><div class="installment-grid"><div class="field"><label>Quantidade de parcelas</label><input id="installmentCount" type="number" min="2" max="360" value="2" inputmode="numeric"></div><div class="field"><label>Periodicidade</label><button type="button" id="installmentFrequencyPick" class="pick"><span><b id="installmentFrequencyTxt">Mensal</b><small>Dia, semana ou mês</small></span><i>⌄</i></button></div></div><div class="installment-preview"><div><small>Valor aproximado por parcela</small><b id="installmentValue">R$ 0,00</b></div><div><small>Situação pelo calendário</small><b id="installmentProgress">—</b></div><span id="installmentNext">Informe data, valor e parcelas.</span></div></div>`;
+    box.innerHTML=`<label class="installment-toggle"><span><b>Compra parcelada</b><small>Divida este gasto e acompanhe automaticamente quantas parcelas faltam.</small></span><span class="switch"><input id="installmentToggle" type="checkbox"><span></span></span></label><div id="installmentDetails" class="installment-details hide"><div class="installment-grid"><div class="field"><label>Quantidade de parcelas</label><input id="installmentCount" type="number" min="2" max="360" value="2" inputmode="numeric"></div><div class="field"><label>Periodicidade</label><button type="button" id="installmentFrequencyPick" class="pick"><span><b id="installmentFrequencyTxt">Mensal</b><small>Dia, semana ou mês</small></span><i>⌄</i></button></div></div><div class="installment-preview"><div><small>Valor exato das parcelas</small><b id="installmentValue">R$ 0,00</b><small id="installmentSplit">Informe o valor total da compra.</small></div><div><small>Situação pelo calendário</small><b id="installmentProgress">—</b></div><span id="installmentNext">Informe data, valor e parcelas.</span></div></div>`;
     paymentField.after(box);
     $('installmentToggle').onchange=()=>{syncInstallmentUi();updateInstallmentPreview()};
     $('installmentCount').oninput=updateInstallmentPreview;
-    $('value').addEventListener('input',updateInstallmentPreview);
     $('date').addEventListener('change',updateInstallmentPreview);
     $('installmentFrequencyPick').onclick=()=>openOpt('Periodicidade',['Diário','Semanal','Mensal'],FREQ_LABEL[currentInstallmentFrequency()],v=>{box.dataset.frequency=v==='Diário'?'day':v==='Semanal'?'week':'month';$('installmentFrequencyTxt').textContent=v;updateInstallmentPreview()});
   }
@@ -113,33 +170,32 @@
     $('installmentToggle').checked=enabled;$('installmentCount').value=enabled?Math.max(2,+inst.count||2):2;$('installmentBox').dataset.frequency=enabled?(inst.frequency||'month'):'month';$('installmentFrequencyTxt').textContent=FREQ_LABEL[currentInstallmentFrequency()]||'Mensal';syncInstallmentUi();updateInstallmentPreview()
   }
   function updateInstallmentPreview(){
-    if(!$('installmentBox'))return;
-    if(!installmentEnabled())return;
-    let count=Math.max(2,Math.min(360,+$('installmentCount').value||2)),total=+$('value').value||0,start=$('date').value||now().d,freq=currentInstallmentFrequency(),fake={date:start,value:total,installment:{enabled:true,count,frequency:freq,startDate:start}},st=installmentState(fake);
-    $('installmentValue').textContent=money(amountForInstallment(total,count,0));
+    if(!$('installmentBox')||!installmentEnabled())return;
+    let count=Math.max(2,Math.min(360,+$('installmentCount').value||2)),totalCents=parseMoneyToCents($('value').value),start=$('date').value||now().d,freq=currentInstallmentFrequency(),fake={date:start,value:totalCents/100,installment:{enabled:true,count,frequency:freq,startDate:start}},st=installmentState(fake),b=installmentBreakdown(totalCents,count);
+    $('installmentValue').textContent=totalCents?(b.remainder?`1ª ${moneyCents(b.high)}`:`${b.count}x de ${moneyCents(b.base)}`):'R$ 0,00';
+    if($('installmentSplit'))$('installmentSplit').textContent=installmentSplitText(totalCents,count);
     $('installmentProgress').textContent=st.complete?'Concluído':`${st.passed} de ${st.count} passaram • faltam ${st.remaining}`;
     $('installmentNext').textContent=st.complete?'Todas as datas das parcelas já passaram.':`Próxima parcela: ${formatDatePt(st.nextDate)} • frequência ${FREQ_LABEL[freq].toLowerCase()}`;
   }
 
   const originalSetType=setType;setType=function(t){originalSetType(t);if(t!=='expense'&&$('installmentToggle'))$('installmentToggle').checked=false;syncInstallmentUi();updateInstallmentPreview()};
   const originalReset=reset;reset=function(){originalReset();resetInstallmentUi()};
-  const originalEdit=window.editEntry;window.editEntry=id=>{let e=E.find(x=>x.id===id);originalEdit(id);if(e)setTimeout(()=>loadInstallmentUi(e),0)};
+  const originalEdit=window.editEntry;window.editEntry=id=>{let e=E.find(x=>x.id===id);originalEdit(id);if(e){$('value').value=formatCentsInput(parseMoneyToCents(e.value));setTimeout(()=>loadInstallmentUi(e),0)}};
 
-  const originalSave=$('save').onclick;
   $('save').onclick=()=>{
-    let wants=installmentEnabled(),count=Math.max(2,Math.min(360,+$('installmentCount')?.value||2)),freq=currentInstallmentFrequency(),start=$('date').value,editingId=edit,before=new Set(E.map(e=>e.id));
+    let totalCents=parseMoneyToCents($('value').value),v=totalCents/100,wants=installmentEnabled(),count=Math.max(2,Math.min(360,+$('installmentCount')?.value||2)),freq=currentInstallmentFrequency(),start=$('date').value||now().d;
+    if(!(totalCents>0)||!cat)return alert('Informe valor e categoria.');
     if(wants&&count<2)return alert('Informe pelo menos 2 parcelas.');
-    originalSave();
-    let target=editingId?E.find(e=>e.id===editingId):E.find(e=>!before.has(e.id));if(!target)return;
-    if(wants)target.installment={enabled:true,count,frequency:freq,startDate:start||target.date,totalValue:+target.value||0};else delete target.installment;
-    target.updatedAt=Date.now();local();render();
+    let t=Date.now(),o={id:edit||crypto.randomUUID?.()||String(t),type,value:v,cat,subcat:sub,payment:pay,description:$('desc').value.trim(),date:$('date').value,time:$('time').value,ts:new Date($('date').value+'T'+$('time').value).getTime(),updatedAt:t};
+    if(wants)o.installment={enabled:true,count,frequency:freq,startDate:start,totalValue:v,totalCents};
+    E=edit?E.map(e=>e.id===edit?o:e):[...E,o];delete D[o.id];local();reset();render();closeLaunch();tab('home')
   };
 
   function expandEntry(entry){
     let inst=entry?.installment;if(entry?.type!=='expense'||!inst?.enabled)return[entry];
-    let st=installmentState(entry),count=st.count,out=[];
+    let st=installmentState(entry),count=st.count,out=[],totalCents=Number.isFinite(+inst.totalCents)?Math.max(0,Math.round(+inst.totalCents)):parseMoneyToCents(inst.totalValue??entry.value);
     for(let i=0;i<count;i++){
-      let date=scheduleDate(st.start,i,st.freq),value=amountForInstallment(inst.totalValue??entry.value,count,i),ts=new Date(date+'T'+(entry.time||'12:00')).getTime();
+      let date=scheduleDate(st.start,i,st.freq),value=amountForInstallmentCents(totalCents,count,i)/100,ts=new Date(date+'T'+(entry.time||'12:00')).getTime();
       out.push({...entry,id:entry.id,date,value,ts,_installmentIndex:i+1,_installmentTotal:count,_installmentFrequency:st.freq,_installmentRemaining:st.remaining,_installmentPassed:st.passed,_installmentNext:st.nextDate,_installmentParentId:entry.id});
     }
     return out
@@ -156,11 +212,11 @@
   function injectInstallmentStyles(){
     if($('financeEnhancementStyle'))return;
     let st=document.createElement('style');st.id='financeEnhancementStyle';st.textContent=`
-      .payment-manage-link{width:100%;margin-top:12px;border:0;border-radius:16px;padding:14px 16px;display:flex;gap:10px;align-items:center;text-align:left;background:color-mix(in srgb,var(--primary,#16a34a) 12%,transparent);color:inherit;font:inherit}.payment-manage-link b{flex:1}.payment-manager{display:grid;gap:14px}.payment-manager-list{display:grid;gap:8px}.payment-manager-row{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:15px;background:var(--card,#fff);border:1px solid rgba(127,127,127,.15)}.payment-manager-row span{flex:1;font-weight:750}.payment-delete{width:36px;height:36px;border:0;border-radius:12px;font-size:22px;background:rgba(239,68,68,.12);color:#dc2626}.payment-add-row{display:grid;grid-template-columns:1fr auto;gap:8px}.payment-add-row button{border:0;border-radius:14px;padding:0 15px;font-weight:800;background:var(--primary,#16a34a);color:white}.payment-help{line-height:1.35;opacity:.72}.payment-settings-card{overflow:hidden}.installment-box{margin:-2px 0 15px;padding:14px;border-radius:18px;background:color-mix(in srgb,var(--primary,#16a34a) 8%,var(--card,#fff));border:1px solid color-mix(in srgb,var(--primary,#16a34a) 22%,transparent)}.installment-toggle{display:flex;align-items:center;gap:12px}.installment-toggle>span:first-child{flex:1;display:grid;gap:3px}.installment-toggle small{opacity:.7;line-height:1.3}.installment-details{padding-top:14px}.installment-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.installment-grid .field{margin:0}.installment-preview{margin-top:12px;padding:12px;border-radius:15px;background:rgba(127,127,127,.08);display:grid;grid-template-columns:1fr 1fr;gap:10px}.installment-preview>div{display:grid;gap:3px}.installment-preview>span{grid-column:1/-1;font-size:12px;opacity:.75}.installment-history{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}.installment-history span{font-size:11px;font-weight:750;padding:4px 7px;border-radius:999px;background:color-mix(in srgb,var(--primary,#16a34a) 11%,transparent)}@media(max-width:390px){.installment-grid,.installment-preview{grid-template-columns:1fr}}`;
+      .payment-manage-link{width:100%;margin-top:12px;border:0;border-radius:16px;padding:14px 16px;display:flex;gap:10px;align-items:center;text-align:left;background:color-mix(in srgb,var(--primary,#16a34a) 12%,transparent);color:inherit;font:inherit}.payment-manage-link b{flex:1}.payment-manager{display:grid;gap:14px}.payment-manager-list{display:grid;gap:8px}.payment-manager-row{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:15px;background:var(--card,#fff);border:1px solid rgba(127,127,127,.15)}.payment-manager-row span{flex:1;font-weight:750}.payment-delete{width:36px;height:36px;border:0;border-radius:12px;font-size:22px;background:rgba(239,68,68,.12);color:#dc2626}.payment-add-row{display:grid;grid-template-columns:1fr auto;gap:8px}.payment-add-row button{border:0;border-radius:14px;padding:0 15px;font-weight:800;background:var(--primary,#16a34a);color:white}.payment-help{line-height:1.35;opacity:.72}.payment-settings-card{overflow:hidden}.installment-box{margin:-2px 0 15px;padding:14px;border-radius:18px;background:color-mix(in srgb,var(--primary,#16a34a) 8%,var(--card,#fff));border:1px solid color-mix(in srgb,var(--primary,#16a34a) 22%,transparent)}.installment-toggle{display:flex;align-items:center;gap:12px}.installment-toggle>span:first-child{flex:1;display:grid;gap:3px}.installment-toggle small{opacity:.7;line-height:1.3}.installment-details{padding-top:14px}.installment-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.installment-grid .field{margin:0}.installment-preview{margin-top:12px;padding:12px;border-radius:15px;background:rgba(127,127,127,.08);display:grid;grid-template-columns:1fr 1fr;gap:10px}.installment-preview>div{display:grid;gap:3px}.installment-preview>div>small:last-child{font-size:11px;line-height:1.35;opacity:.75}.installment-preview>span{grid-column:1/-1;font-size:12px;opacity:.75}.installment-history{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}.installment-history span{font-size:11px;font-weight:750;padding:4px 7px;border-radius:999px;background:color-mix(in srgb,var(--primary,#16a34a) 11%,transparent)}#value[data-money-ready="1"]{font-variant-numeric:tabular-nums;letter-spacing:.01em}@media(max-width:390px){.installment-grid,.installment-preview{grid-template-columns:1fr}}`;
     document.head.appendChild(st)
   }
 
-  paymentMethods();injectInstallmentStyles();injectInstallmentUi();addPaymentSettings();
+  paymentMethods();injectInstallmentStyles();setupMoneyInput();injectInstallmentUi();addPaymentSettings();
   $('payPick').onclick=openPaymentPicker;
   if($('defaultPayPick'))$('defaultPayPick').onclick=()=>openOpt('Pagamento padrão',paymentMethods(),P.defaultPay||paymentMethods()[0],v=>{P={...P,defaultPay:v};local(false,true);renderProfile()});
   syncInstallmentUi();updateInstallmentPreview();render();

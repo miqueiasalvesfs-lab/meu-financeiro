@@ -25,10 +25,12 @@ jobs:
           node --check android/app/src/main/assets/auth.js
           node --check android/app/src/main/assets/ui.js
           node --check android/app/src/main/assets/profile.js
+          node --check android/app/src/main/assets/device-profile.js
           node --check android/app/src/main/assets/finance-enhancements.js
           node --check android/app/src/main/assets/finance-enhancements-core.js
           node --check android/app/src/main/assets/currency-fix.js
           node --check android/app/src/main/assets/installment-progress.js
+          node --check android/app/src/main/assets/installment-amounts.js
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

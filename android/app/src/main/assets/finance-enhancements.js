@@ -4,7 +4,8 @@
       let s=document.createElement('script');s.src=src;s.async=false;s.onload=resolve;s.onerror=reject;document.body.appendChild(s)
     })
   }
-  load('finance-enhancements-core.js')
+  load('device-profile.js')
+    .then(()=>load('finance-enhancements-core.js'))
     .then(()=>load('currency-fix.js'))
     .then(()=>load('installment-progress.js'))
     .then(()=>load('installment-amounts.js'))

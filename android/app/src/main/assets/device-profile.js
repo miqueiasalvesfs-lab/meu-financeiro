@@ -1,13 +1,16 @@
 (function(){
   const PREFIX='dsj_device_display_name:';
-  function key(){return PREFIX+(window.user?.id||'guest')}
-  function fallbackName(){return String(window.P?.name||window.user?.user_metadata?.name||String(window.user?.email||'Usuário').split('@')[0]||'Usuário').trim()||'Usuário'}
+  function accountId(){try{return user?.id||'guest'}catch{return'guest'}}
+  function key(){return PREFIX+accountId()}
+  function fallbackName(){
+    try{return String(P?.name||user?.user_metadata?.name||String(user?.email||'Usuário').split('@')[0]||'Usuário').trim()||'Usuário'}
+    catch{return'Usuário'}
+  }
   function deviceName(){
     try{let v=localStorage.getItem(key());return (v||'').trim()||fallbackName()}catch{return fallbackName()}
   }
   function saveDeviceName(name){try{localStorage.setItem(key(),name.trim());return true}catch{return false}}
 
-  const baseCurrent=window.currentProfileName;
   window.currentProfileName=function(){return deviceName()};
 
   function decorateNameField(){

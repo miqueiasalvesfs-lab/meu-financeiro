@@ -26,6 +26,8 @@ jobs:
           node --check android/app/src/main/assets/ui.js
           node --check android/app/src/main/assets/profile.js
           node --check android/app/src/main/assets/finance-enhancements.js
+          node --check android/app/src/main/assets/finance-enhancements-core.js
+          node --check android/app/src/main/assets/currency-fix.js
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

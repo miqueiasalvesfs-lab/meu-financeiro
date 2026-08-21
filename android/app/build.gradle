@@ -3,26 +3,23 @@ plugins {
 }
 
 android {
-    namespace 'com.ganhosegastos.app'
+    namespace 'com.meulembrete.app'
     compileSdk 36
 
     defaultConfig {
-        applicationId 'com.ganhosegastos.app'
-        minSdk 24
+        applicationId 'com.meulembrete.app'
+        minSdk 26
         targetSdk 36
-        versionCode 7
-        versionName '1.4.2'
+        versionCode 1
+        versionName '1.0.0'
     }
 
-    signingConfigs {
-        release {
-            def keyPath = System.getenv('ANDROID_KEYSTORE_PATH')
-            if (keyPath) {
-                storeFile file(keyPath)
-                storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD')
-                keyAlias System.getenv('ANDROID_KEY_ALIAS')
-                keyPassword System.getenv('ANDROID_KEY_PASSWORD')
-            }
+    sourceSets {
+        main {
+            manifest.srcFile 'src/reminder/AndroidManifest.xml'
+            java.srcDirs = ['src/reminder/java']
+            res.srcDirs = ['src/reminder/res']
+            assets.srcDirs = []
         }
     }
 
@@ -31,7 +28,6 @@ android {
             minifyEnabled false
             shrinkResources false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            if (System.getenv('ANDROID_KEYSTORE_PATH')) signingConfig signingConfigs.release
         }
     }
 
@@ -39,8 +35,4 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
-}
-
-dependencies {
-    implementation 'androidx.webkit:webkit:1.17.0'
 }

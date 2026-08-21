@@ -68,9 +68,7 @@ public class MainActivity extends Activity {
         settings.setDisplayZoomControls(false);
         settings.setUseWideViewPort(true);
         settings.setLoadWithOverviewMode(false);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
-        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
 
         webView.setWebChromeClient(new WebChromeClient() {
             @Override public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> cb, FileChooserParams params) {
@@ -177,23 +175,18 @@ public class MainActivity extends Activity {
                 .setDescription("Ganhos & Gastos protege seus dados neste celular")
                 .setNegativeButton("Cancelar", executor, (dialog, which) -> finishBiometric(enabling, false, "Cancelado"))
                 .build();
-
         try {
             prompt.authenticate(biometricCancellation, executor, new BiometricPrompt.AuthenticationCallback() {
                 @Override public void onAuthenticationSucceeded(BiometricPrompt.AuthenticationResult result) {
                     super.onAuthenticationSucceeded(result);
                     finishBiometric(enabling, true, enabling ? "Biometria ativada." : "Desbloqueado");
                 }
-
                 @Override public void onAuthenticationError(int errorCode, CharSequence errString) {
                     super.onAuthenticationError(errorCode, errString);
                     String msg = errString == null ? "Não foi possível usar a biometria." : errString.toString();
                     finishBiometric(enabling, false, msg);
                 }
-
-                @Override public void onAuthenticationFailed() {
-                    super.onAuthenticationFailed();
-                }
+                @Override public void onAuthenticationFailed() { super.onAuthenticationFailed(); }
             });
         } catch (Exception e) {
             finishBiometric(enabling, false, "Não foi possível abrir a biometria neste aparelho.");
@@ -202,12 +195,17 @@ public class MainActivity extends Activity {
 
     private void handleSystemBack() {
         if (biometricPromptShowing) return;
-        if (webView == null) {
-            requestDoubleBackExit();
-            return;
-        }
+        if (webView == null) { requestDoubleBackExit(); return; }
 
-        String js = "(function(){try{return window.handleAndroidBack?window.handleAndroidBack():'root'}catch(e){return 'root'}})()";
+        String js = "(function(){try{" +
+                "var byId=function(x){return document.getElementById(x)};" +
+                "var bio=byId('bioLock'),opt=byId('optSheet'),cat=byId('catSheet'),launch=byId('launchModal');" +
+                "var overlay=(bio&&!bio.classList.contains('hide'))||(opt&&opt.classList.contains('on'))||(cat&&cat.classList.contains('on'))||(launch&&launch.classList.contains('on'))||document.querySelector('.setting-expand-panel.open');" +
+                "var cur=(window.currentTab?window.currentTab():(document.querySelector('.nav .on')?.dataset.tab||'home'));" +
+                "var hist=false;try{var tmp=navStack.slice();while(tmp.length&&tmp[tmp.length-1]===cur)tmp.pop();hist=tmp.length>0}catch(e){}" +
+                "if(overlay||cur!=='home'||hist){if(window.handleAppBack)window.handleAppBack();return 'handled'}" +
+                "return 'root'}catch(e){return 'root'}})()";
+
         webView.evaluateJavascript(js, result -> {
             String state = result == null ? "root" : result.replace("\"", "");
             if ("handled".equals(state)) {
@@ -233,14 +231,11 @@ public class MainActivity extends Activity {
         Toast.makeText(this, "Pressione Voltar novamente para sair", Toast.LENGTH_SHORT).show();
     }
 
-    @Override @SuppressWarnings("deprecation") public void onBackPressed() {
-        handleSystemBack();
-    }
+    @Override @SuppressWarnings("deprecation") public void onBackPressed() { handleSystemBack(); }
 
     public class AndroidBridge {
         private final Activity activity;
         private final WebView webView;
-
         AndroidBridge(Activity activity, WebView webView) { this.activity = activity; this.webView = webView; }
 
         @JavascriptInterface public void openExternal(String url) {
@@ -249,9 +244,7 @@ public class MainActivity extends Activity {
                     Uri uri = Uri.parse(url);
                     String scheme = uri.getScheme();
                     if ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme)) activity.startActivity(new Intent(Intent.ACTION_VIEW, uri));
-                } catch (Exception e) {
-                    Toast.makeText(activity, "Não foi possível abrir o link.", Toast.LENGTH_SHORT).show();
-                }
+                } catch (Exception e) { Toast.makeText(activity, "Não foi possível abrir o link.", Toast.LENGTH_SHORT).show(); }
             });
         }
 
@@ -265,9 +258,7 @@ public class MainActivity extends Activity {
                     biometricCancellation = null;
                     prefs().edit().putBoolean(PREF_BIOMETRIC, false).apply();
                     sendJs("onBiometricSetupResult", false, "");
-                } else {
-                    showBiometricPrompt(true);
-                }
+                } else showBiometricPrompt(true);
             });
         }
         @JavascriptInterface public void authenticateBiometric() { activity.runOnUiThread(() -> showBiometricPrompt(false)); }
@@ -306,7 +297,6 @@ public class MainActivity extends Activity {
                 }
             }).start();
         }
-
         private String sanitize(String name) { return name == null ? "arquivo" : name.replaceAll("[^a-zA-Z0-9._-]", "_"); }
     }
 }

@@ -27,9 +27,13 @@ import android.widget.Toast;
 
 import androidx.webkit.WebViewAssetLoader;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.Scanner;
 import java.util.concurrent.Executor;
 
 public class MainActivity extends Activity {
@@ -89,14 +93,41 @@ public class MainActivity extends Activity {
 
         webView.addJavascriptInterface(new AndroidBridge(this, webView), "AndroidBridge");
         webView.setWebViewClient(new WebViewClient() {
-            @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) { return assetLoader.shouldInterceptRequest(request.getUrl()); }
-            @Override @SuppressWarnings("deprecation") public WebResourceResponse shouldInterceptRequest(WebView view, String url) { return assetLoader.shouldInterceptRequest(Uri.parse(url)); }
+            @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) { return interceptRequest(request.getUrl()); }
+            @Override @SuppressWarnings("deprecation") public WebResourceResponse shouldInterceptRequest(WebView view, String url) { return interceptRequest(Uri.parse(url)); }
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) { return handleNavigation(request.getUrl()); }
             @Override @SuppressWarnings("deprecation") public boolean shouldOverrideUrlLoading(WebView view, String url) { return handleNavigation(Uri.parse(url)); }
+            @Override public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                applyVariantBranding();
+            }
         });
 
         if (Build.VERSION.SDK_INT >= 33) registerModernBackCallback();
         webView.loadUrl("https://" + APP_HOST + "/assets/index.html");
+    }
+
+    private WebResourceResponse interceptRequest(Uri uri) {
+        if (BuildConfig.APP_SLOT == 2 && "/assets/auth.js".equals(uri.getPath())) {
+            try (InputStream in = getAssets().open("auth.js"); Scanner scanner = new Scanner(in, StandardCharsets.UTF_8.name()).useDelimiter("\\A")) {
+                String js = scanner.hasNext() ? scanner.next() : "";
+                js = js.replace("'finance_state'", "'finance_state_2'");
+                return new WebResourceResponse("application/javascript", "UTF-8",
+                        new ByteArrayInputStream(js.getBytes(StandardCharsets.UTF_8)));
+            } catch (Exception e) {
+                return assetLoader.shouldInterceptRequest(uri);
+            }
+        }
+        return assetLoader.shouldInterceptRequest(uri);
+    }
+
+    private void applyVariantBranding() {
+        if (BuildConfig.APP_SLOT != 2 || webView == null) return;
+        String js = "(function(){var n='Do Seu Jeito 2';function a(){" +
+                "document.title=n;var b=document.querySelector('.brand h1');if(b&&b.textContent!==n)b.textContent=n;" +
+                "var l=document.querySelector('.bio-lock-card h2');if(l&&l.textContent!==n+' bloqueado')l.textContent=n+' bloqueado';" +
+                "}a();if(!window.__dsj2BrandObserver){window.__dsj2BrandObserver=new MutationObserver(a);window.__dsj2BrandObserver.observe(document.body,{childList:true,subtree:true,characterData:true});}})()";
+        webView.evaluateJavascript(js, null);
     }
 
     @TargetApi(33)
@@ -169,10 +200,11 @@ public class MainActivity extends Activity {
         biometricPromptShowing = true;
         Executor executor = getMainExecutor();
         biometricCancellation = new CancellationSignal();
+        String appName = BuildConfig.APP_SLOT == 2 ? "Do Seu Jeito 2" : "Do Seu Jeito";
         BiometricPrompt prompt = new BiometricPrompt.Builder(this)
                 .setTitle(enabling ? "Ativar biometria" : "Desbloquear")
                 .setSubtitle("Use sua digital ou reconhecimento facial")
-                .setDescription("Ganhos & Gastos protege seus dados neste celular")
+                .setDescription(appName + " protege seus dados neste celular")
                 .setNegativeButton("Cancelar", executor, (dialog, which) -> finishBiometric(enabling, false, "Cancelado"))
                 .build();
         try {
@@ -237,6 +269,8 @@ public class MainActivity extends Activity {
         private final Activity activity;
         private final WebView webView;
         AndroidBridge(Activity activity, WebView webView) { this.activity = activity; this.webView = webView; }
+
+        @JavascriptInterface public int appSlot() { return BuildConfig.APP_SLOT; }
 
         @JavascriptInterface public void openExternal(String url) {
             activity.runOnUiThread(() -> {

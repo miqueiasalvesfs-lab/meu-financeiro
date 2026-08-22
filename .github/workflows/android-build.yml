@@ -41,10 +41,10 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
-      - name: Build installable APK
+      - name: Build both installable APKs
         working-directory: android
         run: gradle :app:assembleDebug --stacktrace
       - uses: actions/upload-artifact@v4
         with:
-          name: do-seu-jeito-apk
-          path: android/app/build/outputs/apk/debug/*.apk
+          name: do-seu-jeito-duplo-apks
+          path: android/app/build/outputs/apk/*/debug/*.apk

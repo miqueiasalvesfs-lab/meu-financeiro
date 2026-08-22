@@ -7,11 +7,30 @@ android {
     compileSdk 36
 
     defaultConfig {
-        applicationId 'com.ganhosegastos.app'
         minSdk 24
         targetSdk 36
-        versionCode 10
-        versionName '1.5.2'
+        versionCode 11
+        versionName '1.6.0'
+    }
+
+    flavorDimensions += 'control'
+    productFlavors {
+        principal {
+            dimension 'control'
+            applicationId 'com.ganhosegastos.app'
+            buildConfigField 'int', 'APP_SLOT', '1'
+            resValue 'string', 'app_name', 'Do Seu Jeito'
+        }
+        segundo {
+            dimension 'control'
+            applicationId 'com.ganhosegastos.app2'
+            buildConfigField 'int', 'APP_SLOT', '2'
+            resValue 'string', 'app_name', 'Do Seu Jeito 2'
+        }
+    }
+
+    buildFeatures {
+        buildConfig true
     }
 
     signingConfigs {

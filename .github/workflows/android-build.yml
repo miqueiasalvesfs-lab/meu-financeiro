@@ -31,6 +31,7 @@ jobs:
           node --check android/app/src/main/assets/currency-fix.js
           node --check android/app/src/main/assets/installment-progress.js
           node --check android/app/src/main/assets/installment-amounts.js
+          node --check android/app/src/main/assets/open-finance.js
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

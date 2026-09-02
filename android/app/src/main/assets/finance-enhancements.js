@@ -9,6 +9,6 @@
     .then(()=>load('currency-fix.js'))
     .then(()=>load('installment-progress.js'))
     .then(()=>load('installment-amounts.js'))
-    .then(()=>load('open-finance.js'))
+    .then(()=>load('modern-settings.js'))
     .catch(err=>console.error('Falha ao carregar recursos financeiros',err));
 })();

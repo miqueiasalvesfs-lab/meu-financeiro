@@ -15,6 +15,7 @@ import android.os.Environment;
 import android.print.PrintManager;
 import android.provider.MediaStore;
 import android.util.Base64;
+import android.view.WindowInsets;
 import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -56,6 +57,7 @@ public class MainActivity extends Activity {
         webView.setVerticalScrollBarEnabled(false);
         webView.setHorizontalScrollBarEnabled(false);
         setContentView(webView);
+        applySystemBarInsets();
 
         assetLoader = new WebViewAssetLoader.Builder()
                 .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
@@ -105,6 +107,22 @@ public class MainActivity extends Activity {
 
         if (Build.VERSION.SDK_INT >= 33) registerModernBackCallback();
         webView.loadUrl("https://" + APP_HOST + "/assets/index.html");
+    }
+
+    private void applySystemBarInsets() {
+        webView.setOnApplyWindowInsetsListener((view, insets) -> {
+            int topInset;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                topInset = insets.getInsets(WindowInsets.Type.statusBars()).top;
+            } else {
+                topInset = insets.getSystemWindowInsetTop();
+            }
+            if (view.getPaddingTop() != topInset) {
+                view.setPadding(view.getPaddingLeft(), topInset, view.getPaddingRight(), view.getPaddingBottom());
+            }
+            return insets;
+        });
+        webView.post(webView::requestApplyInsets);
     }
 
     private WebResourceResponse interceptRequest(Uri uri) {

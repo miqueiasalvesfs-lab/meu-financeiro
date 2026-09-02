@@ -10,5 +10,6 @@
     .then(()=>load('installment-progress.js'))
     .then(()=>load('installment-amounts.js'))
     .then(()=>load('modern-settings.js'))
+    .then(()=>load('interaction-polish.js'))
     .catch(err=>console.error('Falha ao carregar recursos financeiros',err));
 })();
